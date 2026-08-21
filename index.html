@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>뽀모도로</title>
+<style>
+  :root{
+    --bg:#faf3ee;
+    --bg2:#f3e4de;
+    --card:#fffaf7;
+    --ink:#6b5550;
+    --ink-soft:#b7a49e;
+    --pie:#dda3a8;
+    --pie-deep:#d0898f;
+    --tick:#cbb6ae;
+    --track:#f2e5dd;
+    --beige:#e4d3c8;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    min-height:100vh;
+    display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(165deg,var(--bg) 0%,var(--bg2) 100%);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif;
+    color:var(--ink);padding:24px;
+    -webkit-font-smoothing:antialiased;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .app{
+    width:100%;max-width:360px;
+    background:var(--card);
+    border-radius:34px;
+    padding:22px 26px 26px;
+    box-shadow:0 14px 44px rgba(160,120,110,.14);
+    text-align:center;
+    user-select:none;-webkit-user-select:none;
+  }
+
+  /* 모드 (아이콘) */
+  .modes{
+    display:flex;gap:4px;
+    background:var(--track);border-radius:15px;padding:4px;
+  }
+  .modes button{
+    flex:1;border:0;background:transparent;cursor:pointer;
+    padding:9px 0;border-radius:12px;
+    color:var(--ink-soft);transition:.25s;
+    display:grid;place-items:center;
+  }
+  .modes button.on{
+    background:var(--card);color:var(--ink);
+    box-shadow:0 2px 8px rgba(160,120,110,.13);
+  }
+
+  /* 다이얼 */
+  .dial{width:100%;display:block;margin:6px 0 2px;touch-action:none;cursor:grab}
+  .dial.dragging{cursor:grabbing}
+  .dial .num{
+    font-size:11px;font-weight:500;fill:var(--ink-soft);
+    font-family:inherit;
+  }
+  .dial .tick{stroke:var(--tick);stroke-linecap:round}
+  .dial .tick.major{stroke-width:2.4}
+  .dial .tick.minor{stroke-width:1.1;opacity:.65}
+  .dial .pie{fill:var(--pie);transition:fill .4s}
+  .dial .hand{stroke:var(--pie-deep);stroke-width:2.6;stroke-linecap:round;transition:stroke .4s}
+  .dial .hub{fill:var(--pie-deep);transition:fill .4s}
+  .dial .knob{fill:var(--card);stroke:var(--pie-deep);stroke-width:3;transition:r .15s,stroke .4s,opacity .3s}
+  .dial.dragging .knob{r:10}
+  /* 돌아가는 중엔 다이얼 잠금 */
+  body.running .dial{cursor:default}
+  body.running .knob{opacity:0}
+
+  .time{
+    font-size:44px;font-weight:300;letter-spacing:-.5px;
+    font-variant-numeric:tabular-nums;
+    margin:2px 0 20px;
+  }
+
+  /* 컨트롤 */
+  .controls{display:flex;align-items:center;justify-content:center;gap:14px}
+  button{font:inherit;border:0;cursor:pointer;transition:transform .15s,background .2s,color .2s}
+  button:active{transform:scale(.94)}
+  .primary{
+    width:64px;height:64px;border-radius:50%;
+    background:var(--pie);color:#fff;
+    display:grid;place-items:center;
+    box-shadow:0 7px 20px rgba(208,137,143,.35);
+  }
+  .primary:hover{background:var(--pie-deep)}
+  .ghost{
+    width:46px;height:46px;border-radius:50%;
+    background:var(--track);color:var(--ink-soft);
+    display:grid;place-items:center;
+  }
+  .ghost:hover{background:var(--beige);color:var(--ink)}
+
+  /* 하단 */
+  .foot{
+    margin-top:22px;padding-top:18px;
+    border-top:1px solid var(--track);
+    display:flex;align-items:center;justify-content:space-between;
+  }
+  .dots{display:flex;gap:7px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--beige);transition:.3s}
+  .dot.done{background:var(--pie)}
+  .gear{
+    background:none;color:var(--ink-soft);
+    width:28px;height:28px;border-radius:8px;
+    display:grid;place-items:center;
+  }
+  .gear:hover{color:var(--ink);background:var(--track)}
+
+  /* 설정 */
+  .settings{max-height:0;overflow:hidden;transition:max-height .3s ease}
+  .settings.open{max-height:220px}
+  .settings .inner{padding-top:18px;display:grid;gap:11px}
+  .row{display:flex;align-items:center;justify-content:space-between}
+  .row .ic{color:var(--ink-soft);display:grid;place-items:center}
+  .row input{
+    width:66px;padding:7px 10px;text-align:center;
+    font:inherit;font-size:13px;color:var(--ink);
+    border:1px solid var(--track);border-radius:9px;
+    background:var(--bg);outline:none;
+  }
+  .row input:focus{border-color:var(--pie)}
+
+  body.rest{--pie:#c6b3a3;--pie-deep:#b5a191}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="modes">
+    <!-- 집중 -->
+    <button data-mode="focus" class="on" aria-label="집중">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4" fill="currentColor" stroke="none"/>
+      </svg>
+    </button>
+    <!-- 짧은 휴식 -->
+    <button data-mode="short" aria-label="짧은 휴식">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9z"/>
+        <path d="M17 10h1.6a2.4 2.4 0 0 1 0 4.8H17"/>
+        <path d="M8 3v2M12 3v2"/>
+      </svg>
+    </button>
+    <!-- 긴 휴식 -->
+    <button data-mode="long" aria-label="긴 휴식">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a6.8 6.8 0 0 0 11 11z"/>
+      </svg>
+    </button>
+  </div>
+
+  <svg class="dial" viewBox="0 0 300 300" id="dial">
+    <g id="ticks"></g>
+    <g id="nums"></g>
+    <path class="pie" id="pie"></path>
+    <line class="hand" id="hand" x1="150" y1="150" x2="150" y2="52"></line>
+    <circle class="hub" cx="150" cy="150" r="4.5"></circle>
+    <circle class="knob" id="knob" cx="150" cy="52" r="8"></circle>
+  </svg>
+
+  <div class="time" id="time">25:00</div>
+
+  <div class="controls">
+    <button class="ghost" id="reset" aria-label="리셋">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12a9 9 0 1 0 2.6-6.4"/><path d="M3 4v5h5"/>
+      </svg>
+    </button>
+
+    <button class="primary" id="toggle" aria-label="시작/일시정지">
+      <svg id="icon-play" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M8.5 5.4v13.2a.6.6 0 0 0 .93.5l9.6-6.6a.6.6 0 0 0 0-1l-9.6-6.6a.6.6 0 0 0-.93.5z"/>
+      </svg>
+      <svg id="icon-pause" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+        <rect x="7" y="5" width="3.6" height="14" rx="1.5"/><rect x="13.4" y="5" width="3.6" height="14" rx="1.5"/>
+      </svg>
+    </button>
+
+    <button class="ghost" id="skip" aria-label="건너뛰기">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 5l9 7-9 7z" fill="currentColor"/><path d="M19 5v14"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="foot">
+    <div class="dots" id="dots"></div>
+    <button class="gear" id="gear" aria-label="설정">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M4 7h10M18 7h2M4 17h2M10 17h10"/>
+        <circle cx="16" cy="7" r="2.2"/><circle cx="8" cy="17" r="2.2"/>
+      </svg>
+    </button>
+  </div>
+
+  <div class="settings" id="settings">
+    <div class="inner">
+      <div class="row">
+        <span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4" fill="currentColor" stroke="none"/></svg></span>
+        <input type="number" id="s-focus" min="1" max="60" value="25">
+      </div>
+      <div class="row">
+        <span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9z"/><path d="M17 10h1.6a2.4 2.4 0 0 1 0 4.8H17"/></svg></span>
+        <input type="number" id="s-short" min="1" max="60" value="5">
+      </div>
+      <div class="row">
+        <span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a6.8 6.8 0 0 0 11 11z"/></svg></span>
+        <input type="number" id="s-long" min="1" max="60" value="15">
+      </div>
+      <div class="row">
+        <span class="ic"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l3.5 3.5L17 9"/><path d="M20.5 5.5H7a4 4 0 0 0-4 4V11"/><path d="M7 22l-3.5-3.5L7 15"/><path d="M3.5 18.5H17a4 4 0 0 0 4-4V13"/></svg></span>
+        <input type="number" id="s-round" min="2" max="8" value="4">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* 다이얼은 실제 타이머처럼 60분이 한 바퀴 — 25분이면 원의 25/60만큼 채워진다 */
+const C = 150, R_PIE = 98;
+
+const store = {
+  load() { try { return JSON.parse(localStorage.getItem('pomo-cfg') || '{}'); } catch (e) { return {}; } },
+  save(v) { try { localStorage.setItem('pomo-cfg', JSON.stringify(v)); } catch (e) {} }
+};
+
+const cfg = Object.assign({ focus: 25, short: 5, long: 15, round: 4 }, store.load());
+
+let mode = 'focus';
+let left = cfg.focus * 60;
+let running = false;
+let ticker = null;
+let done = 0;    // 누적 집중 횟수
+let cycle = 0;   // 긴 휴식까지의 진행도
+let endAt = 0;   // 절대 종료 시각 (탭이 백그라운드여도 안 밀리게)
+
+const $ = id => document.getElementById(id);
+const pie = $('pie'), timeEl = $('time'), hand = $('hand'), knob = $('knob'), dial = $('dial');
+let dragging = false;
+
+/* --- 눈금과 숫자 그리기 (한 번만) --- */
+(function buildDial() {
+  const pt = (min, r) => {
+    const a = (-90 + min * 6) * Math.PI / 180;
+    return [C + r * Math.cos(a), C + r * Math.sin(a)];
+  };
+  let ticks = '';
+  for (let m = 0; m < 60; m++) {
+    const major = m % 5 === 0;
+    const [x1, y1] = pt(m, 118);
+    const [x2, y2] = pt(m, major ? 104 : 112);
+    ticks += `<line class="tick ${major ? 'major' : 'minor'}" x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"/>`;
+  }
+  $('ticks').innerHTML = ticks;
+
+  let nums = '';
+  for (let m = 0; m < 60; m += 5) {
+    const [x, y] = pt(m, 134);
+    nums += `<text class="num" x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" dominant-baseline="central">${m}</text>`;
+  }
+  $('nums').innerHTML = nums;
+})();
+
+function wedge(frac) {
+  if (frac <= 0) return '';
+  if (frac >= 1) {  // 완전한 원은 호 하나로 못 그려서 반원 두 개로
+    return `M ${C} ${C - R_PIE} A ${R_PIE} ${R_PIE} 0 1 1 ${C} ${C + R_PIE} A ${R_PIE} ${R_PIE} 0 1 1 ${C} ${C - R_PIE} Z`;
+  }
+  const a = (-90 + frac * 360) * Math.PI / 180;
+  const x = C + R_PIE * Math.cos(a), y = C + R_PIE * Math.sin(a);
+  return `M ${C} ${C} L ${C} ${C - R_PIE} A ${R_PIE} ${R_PIE} 0 ${frac > .5 ? 1 : 0} 1 ${x.toFixed(2)} ${y.toFixed(2)} Z`;
+}
+
+function total() { return cfg[mode] * 60; }
+
+function render() {
+  const m = Math.floor(left / 60), s = left % 60;
+  timeEl.textContent = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+  const frac = Math.min(1, left / 3600);
+  pie.setAttribute('d', wedge(frac));
+
+  const a = (-90 + frac * 360) * Math.PI / 180;
+  const hx = C + R_PIE * Math.cos(a), hy = C + R_PIE * Math.sin(a);
+  hand.setAttribute('x2', hx.toFixed(2)); hand.setAttribute('y2', hy.toFixed(2));
+  knob.setAttribute('cx', hx.toFixed(2)); knob.setAttribute('cy', hy.toFixed(2));
+
+  $('icon-play').style.display  = running ? 'none' : '';
+  $('icon-pause').style.display = running ? '' : 'none';
+
+  document.title = running ? `${timeEl.textContent} · 뽀모도로` : '뽀모도로';
+  document.body.classList.toggle('rest', mode !== 'focus');
+  document.body.classList.toggle('running', running);
+
+  document.querySelectorAll('.modes button')
+    .forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+
+  $('dots').innerHTML = Array.from({ length: cfg.round },
+    (_, i) => `<span class="dot${i < cycle ? ' done' : ''}"></span>`).join('');
+}
+
+function setMode(next, autostart = false) {
+  mode = next;
+  left = total();
+  stop();
+  if (autostart) start(); else render();
+}
+
+function start() {
+  if (running) return;
+  running = true;
+  endAt = Date.now() + left * 1000;
+  ticker = setInterval(tick, 200);
+  render();
+}
+
+function stop() {
+  running = false;
+  clearInterval(ticker);
+  render();
+}
+
+function tick() {
+  const next = Math.max(0, Math.round((endAt - Date.now()) / 1000));
+  if (next === left) return;
+  left = next;
+  if (left <= 0) { finish(); return; }
+  render();
+}
+
+function finish() {
+  stop();
+  chime();
+  if (mode === 'focus') {
+    done++; cycle++;
+    setMode(cycle >= cfg.round ? 'long' : 'short', true);
+  } else {
+    if (mode === 'long') cycle = 0;
+    setMode('focus', true);
+  }
+}
+
+function chime() {
+  try {
+    const ac = new (window.AudioContext || window.webkitAudioContext)();
+    [0, .18, .36].forEach((t, i) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = 'sine';
+      o.frequency.value = [660, 880, 1046][i];
+      o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(0, ac.currentTime + t);
+      g.gain.linearRampToValueAtTime(.18, ac.currentTime + t + .02);
+      g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + t + .5);
+      o.start(ac.currentTime + t);
+      o.stop(ac.currentTime + t + .55);
+    });
+  } catch (e) { /* 소리가 막힌 환경은 조용히 넘어간다 */ }
+}
+
+/* --- 다이얼 돌려서 시간 맞추기 --- */
+function minutesAt(e) {
+  const r = dial.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width * 300 - C;
+  const y = (e.clientY - r.top) / r.height * 300 - C;
+  if (Math.hypot(x, y) > 132) return null;              // 다이얼 바깥은 무시
+  const deg = (Math.atan2(y, x) * 180 / Math.PI + 90 + 360) % 360;
+  return Math.min(60, Math.max(1, Math.round(deg / 6)));  // 1분 단위, 1~60분
+}
+
+function setMinutes(min) {
+  cfg[mode] = min;
+  store.save(cfg);
+  $('s-' + mode).value = min;
+  left = min * 60;
+  render();
+}
+
+dial.addEventListener('pointerdown', e => {
+  if (running) return;            // 돌아가는 중엔 잠금 — 실수로 건드려도 안 바뀐다
+  const min = minutesAt(e);
+  if (min === null) return;
+  dragging = true;
+  dial.classList.add('dragging');
+  dial.setPointerCapture(e.pointerId);
+  setMinutes(min);
+});
+
+dial.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  let min = minutesAt(e);
+  if (min === null) return;
+  // 꼭대기(0=60분)를 지날 때 1분↔60분으로 튀지 않게 끝에서 멈춘다
+  if (min - cfg[mode] > 30) min = 1;
+  else if (cfg[mode] - min > 30) min = 60;
+  setMinutes(min);
+});
+
+['pointerup', 'pointercancel'].forEach(ev => dial.addEventListener(ev, () => {
+  dragging = false;
+  dial.classList.remove('dragging');
+}));
+
+/* --- 이벤트 --- */
+$('toggle').onclick = () => running ? stop() : start();
+$('reset').onclick  = () => { left = total(); stop(); };
+$('skip').onclick   = () => finish();
+$('gear').onclick   = () => $('settings').classList.toggle('open');
+
+document.querySelectorAll('.modes button').forEach(b => {
+  b.onclick = () => setMode(b.dataset.mode);
+});
+
+['focus', 'short', 'long', 'round'].forEach(k => {
+  const el = $('s-' + k);
+  el.value = cfg[k];
+  el.onchange = () => {
+    const v = Math.max(+el.min, Math.min(+el.max, +el.value || cfg[k]));
+    el.value = v;
+    cfg[k] = v;
+    store.save(cfg);
+    if (k === 'round' && cycle > v) cycle = 0;
+    if (!running) left = total();
+    render();
+  };
+});
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
+    e.preventDefault();
+    running ? stop() : start();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
